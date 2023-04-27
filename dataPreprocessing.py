@@ -13,7 +13,7 @@ import os
 # os.chdir(r'C:\Users\USER\Desktop\benchmarking-clustering-cpr')
 
 
-# Read in the data
+# Read the data
 data = pd.read_csv('building_energy_2019_2021.csv', index_col=0, encoding='cp949')
 
 # Drop missing values in the specific columns
