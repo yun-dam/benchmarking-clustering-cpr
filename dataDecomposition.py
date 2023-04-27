@@ -13,54 +13,78 @@ import numpy as np
 import pymannkendall as mk
 from typing import Tuple, Union
 
-os.chdir(r'C:\Users\USER\Desktop\benchmarking-clustering-cpr')
+os.chdir(r'C:\Users\YUNDAM\Desktop\benchmarking-clustering-cpr')
 
 # read the data
 data = pd.read_csv('building_energy_2019_2021_preprocessed.csv', index_col=0, encoding='cp949')
 
+# %% energy data
 
-# %% 
+year = ['2019', '2020', '2021']
+month = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12']
 
-elec = data.loc[:, ['elec201901',
-'elec201902', 'elec201903', 'elec201904', 'elec201905', 'elec201906',
-'elec201907', 'elec201908', 'elec201909', 'elec201910', 'elec201911',
-'elec201912', 'elec202001', 'elec202002',
-'elec202003', 'elec202004', 'elec202005', 'elec202006', 'elec202007',
-'elec202008', 'elec202009', 'elec202010', 'elec202011', 'elec202012',
- 'elec202101', 'elec202102', 'elec202103',
-'elec202104', 'elec202105', 'elec202106', 'elec202107', 'elec202108',
-'elec202109', 'elec202110', 'elec202111', 'elec202112' ]] 
+elecColumnList = []
+for a in year:
+    for b in month:
+        elecColumnList.append('elec' + a + b)
 
-gas = data.loc[:,['gas201901', 'gas201902', 'gas201903', 'gas201904',
-'gas201905', 'gas201906', 'gas201907', 'gas201908', 'gas201909',
-'gas201910', 'gas201911', 'gas201912', 'gas202001', 'gas202002', 'gas202003', 'gas202004', 'gas202005',
-'gas202006', 'gas202007', 'gas202008', 'gas202009', 'gas202010',
-'gas202011', 'gas202012', 'gas202101', 'gas202102', 'gas202103', 'gas202104', 'gas202105', 'gas202106',
-'gas202107', 'gas202108', 'gas202109', 'gas202110', 'gas202111',
-'gas202112']]
+gasColumnList = []
+for a in year:
+    for b in month:
+        gasColumnList.append('gas' + a + b)
 
-# %%
-# 월별 데이터라서  period=12 로 잡음. 값 안넣어도 자동으로 12로 잡힘
-# model="multiplicative" 넣으면 multiplicative decomposition 함
-for k in range(50,100,1):
+elec = data.loc[:, elecColumnList] 
+gas = data.loc[:,gasColumnList]
+
+# %% decompose time-series energy data
+
+decompositionList = ['season', 'trend', 'resid']
+
+elecDecomposeColumnList = []
+for a in decompositionList:
+    for b in year:
+        for c in month:
+            elecDecomposeColumnList.append('elec' + b + c + '_' + a)
+
+gasDecomposeColumnList = []
+for a in decompositionList:
+    for b in year:
+        for c in month:
+            gasDecomposeColumnList.append('gas' + b + c + '_' + a)
+
+dataDecompositionElec = pd.DataFrame(0, index=np.arange(len(elec)), columns = elecDecomposeColumnList)
+dataDecompositionGas = pd.DataFrame(0, index=np.arange(len(gas)), columns = gasDecomposeColumnList)
+
+for k in range(len(elec)):
     tsData = elec.iloc[k,:] / data.loc[:,'연면적(㎡)'][k]
-    
-    dec = seasonal_decompose(tsData, model='additive', period=12)
-    fig = dec.plot()
-    fig.set_size_inches(9, 5)
-    print(1-(np.var(dec.resid)/np.var(dec.trend+dec.resid)))
-    
-    
-# %%
-k = 411
-tsData = elec.iloc[k,:] / data.loc[:,'연면적(㎡)'][k]
+    decomposed = seasonal_decompose(tsData, model='additive', period=12)
+    dataDecompositionElec.iloc[k, :] = np.concatenate( (decomposed.seasonal, decomposed.trend, decomposed.resid) )
 
-dec = seasonal_decompose(tsData, model='additive', period=12)
-fig = dec.plot()
-fig.set_size_inches(9, 5)
-print(1-(np.var(dec.resid)/np.var(dec.trend+dec.resid)))
+for k in range(len(gas)):
+    tsData = gas.iloc[k,:] / data.loc[:,'연면적(㎡)'][k]
+    decomposed = seasonal_decompose(tsData, model='additive', period=12)
+    dataDecompositionGas.iloc[k, :] = np.concatenate( (decomposed.seasonal, decomposed.trend, decomposed.resid) )
 
-result = mk.original_test(tsData)
+dataDecomposition = pd.concat([dataDecompositionElec, dataDecompositionGas], ignore_index=True, axis = 1)
+
+# Save data
+# data.to_csv('./building_energy_2019_2021_decomposed.csv', encoding='cp949')  
+
+# %% Mann-Kendall test to quantify a trend in time-series data
+
+kendallTau = []
+pValue = []
+trendType = []
+
+for k in range(len(elec)):
+    
+    tsData = elec.iloc[k,:] / data.loc[:,'연면적(㎡)'][k]
+    trendKendall = mk.original_test(tsData)
+    trendType.append(trendKendall[0])
+    kendallTau.append(trendKendall[4])
+    pValue.append(trendKendall[2])
+    
+    
 # %%
 
 
