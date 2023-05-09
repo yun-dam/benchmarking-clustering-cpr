@@ -65,10 +65,12 @@ for k in range(len(gas)):
     decomposed = seasonal_decompose(tsData, model='additive', period=12)
     dataDecompositionGas.iloc[k, :] = np.concatenate( (decomposed.seasonal, decomposed.trend, decomposed.resid) )
 
-dataDecomposition = pd.concat([dataDecompositionElec, dataDecompositionGas], ignore_index=True, axis = 1)
+dataDecompositionElec.index = data.index
+dataDecompositionGas.index = data.index
 
-# Save data
-# data.to_csv('./building_energy_2019_2021_decomposed.csv', encoding='cp949')  
+dataDecomposition = pd.concat([dataDecompositionElec, dataDecompositionGas], axis = 1)
+dataDecomposition = pd.concat([data, dataDecomposition], axis = 1)
+
 
 # %% Mann-Kendall test to quantify a trend in time-series data
 
@@ -83,55 +85,14 @@ for k in range(len(elec)):
     trendType.append(trendKendall[0])
     kendallTau.append(trendKendall[4])
     pValue.append(trendKendall[2])
-    
-    
+
+dataDecomposition['trend_type'] = trendType
+dataDecomposition['p_value'] = pValue
+dataDecomposition['kendall_tau'] = kendallTau
+
+
+# Save data
+dataDecomposition.to_csv('./building_energy_2019_2021_decomposed.csv', encoding='cp949')  
+
+
 # %%
-
-
-
-def trend(series: Union[np.ndarray, pd.Series, pd.DataFrame], 
-          test: str ='consensus',
-          tests: dict = {
-            'hamed_rao': pymannkendall.hamed_rao_modification_test,
-            'normal': pymannkendall.original_test,
-            'yue_wang': pymannkendall.yue_wang_modification_test
-           }) -> Tuple[list, float]:
-    """
-    Applies the Mann Kendall test  to the series and
-    averages the results of each test in `tests`
-
-    Parameters
-    -----------
-    series: Union[numpy.ndarray, pandas.Series, pandas.DataFrame]
-        the input series - a univariate array
-    test: str
-        default: 'consensus'
-    tests: dict
-        a dict of pymannkendall tests. default tests are 
-        `hamed_rao`, `normal` and `yue_wang`
-    
-    Returns
-    --------
-    Tuple[list, float]
-
-    A list of result objects as well 
-    as the trend [1=positive, 0=no trend, -1=negative]
-    """
-    trend = 0.
-    if test == "consensus":
-        results = []
-        for t, v in tests.items():
-            results.append(v(series))
-        for r in results:
-            if r.trend == 'decreasing':
-                trend -= 1
-            elif r.trend == 'increasing':
-                trend += 1
-
-    # consensus average
-    return results, round(trend / len(tests))
-
-
-a = trend(tsData)
-
-result = mk.original_test(tsData)
